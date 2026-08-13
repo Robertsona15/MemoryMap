@@ -9,8 +9,8 @@ export default function NeuralNetworkMap({ memories, onNodeClick }) {
   const fgRef = useRef();
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
   const [images, setImages] = useState({});
+  const [expandedStacks, setExpandedStacks] = useState(new Set());
 
-  // Asynchronously load images for canvas rendering
   useEffect(() => {
     let active = true;
     async function loadImages() {
@@ -34,13 +34,13 @@ export default function NeuralNetworkMap({ memories, onNodeClick }) {
   }, [memories]);
 
   useEffect(() => {
-    const nodes = [];
-    const links = [];
+    const rawNodes = [];
+    const hubNodes = [];
+    const baseLinks = [];
 
-    // Filter out memories that have no emotions
     const mapMemories = memories.filter(m => m.emotions && m.emotions.length > 0);
 
-    // 1. Build adjacency list for explicit grouping (Black Hole links)
+    // 1. Build adjacency list for explicit grouping (Entity Name & GROUP: links)
     const adj = {};
     mapMemories.forEach(m => { adj[m.id] = new Set(); });
     
@@ -55,7 +55,6 @@ export default function NeuralNetworkMap({ memories, onNodeClick }) {
         const m2IsGroupOf1 = adv2.entityName && (adv1.linkedMemories || []).includes(`GROUP:${adv2.entityName.trim()}`);
         const m1IsGroupOf2 = adv1.entityName && (adv2.linkedMemories || []).includes(`GROUP:${adv1.entityName.trim()}`);
         const hasGroupExplicitLink = m2IsGroupOf1 || m1IsGroupOf2;
-        
         const hasSharedEntity = adv1.entityName && adv2.entityName && adv1.entityName.trim().toLowerCase() === adv2.entityName.trim().toLowerCase();
         
         if (hasExplicitLink || hasGroupExplicitLink || hasSharedEntity) {
@@ -65,7 +64,6 @@ export default function NeuralNetworkMap({ memories, onNodeClick }) {
       }
     }
 
-    // 2. Find connected components (groups)
     const visited = new Set();
     const groups = [];
     mapMemories.forEach(m => {
@@ -87,19 +85,17 @@ export default function NeuralNetworkMap({ memories, onNodeClick }) {
       }
     });
 
-    // 3. Process groups to create Nodes (and sub-cluster them based on emotional trend)
+    // 3. Process groups to create Hubs, Memory Nodes, and Spoke Links
     groups.forEach(group => {
-      if (group.length === 1) {
-        // Ungrouped memory (or isolated group)
-        const mem = group[0];
+      // First, ALWAYS generate raw Memory Nodes for every memory in the group
+      group.forEach(mem => {
         let primaryColor = '#C8B6E2';
-        if (mem.emotions && mem.emotions.length > 0) {
-          const emKey = mem.emotions[0];
-          if (emotions[emKey]) primaryColor = emotions[emKey].color;
+        if (mem.emotions && mem.emotions.length > 0 && emotions[mem.emotions[0]]) {
+          primaryColor = emotions[mem.emotions[0]].color;
         }
         const targetCoord = getMemoryTargetCoordinate(mem.emotions);
         
-        nodes.push({
+        rawNodes.push({
           id: mem.id,
           name: mem.fileName,
           val: 1.5,
@@ -110,138 +106,194 @@ export default function NeuralNetworkMap({ memories, onNodeClick }) {
           subCategoryData: mem.subCategoryData || {},
           targetX: targetCoord.x,
           targetY: targetCoord.y,
-          isCluster: false
+          isCluster: false,
+          isHub: false
         });
-        return;
-      }
+      });
 
-      // Group has > 1 memory. Sub-cluster them based on distance (emotional trend)
-      const coords = group.map(m => getMemoryTargetCoordinate(m.emotions));
-      const subAdj = Array(group.length).fill(0).map(() => []);
-      
-      for (let i = 0; i < group.length; i++) {
-        for (let j = i + 1; j < group.length; j++) {
-          const dx = coords[i].x - coords[j].x;
-          const dy = coords[i].y - coords[j].y;
-          const dist = Math.sqrt(dx*dx + dy*dy);
-          // 150 pixel threshold for "sharing a trend"
-          if (dist <= 150) { 
-            subAdj[i].push(j);
-            subAdj[j].push(i);
-          }
-        }
-      }
-
-      // Find connected components within the subAdj
-      const subVisited = new Set();
-      const subGroups = [];
-      for (let i = 0; i < group.length; i++) {
-        if (!subVisited.has(i)) {
-          const subGroup = [];
-          const queue = [i];
-          subVisited.add(i);
-          while (queue.length > 0) {
-            const curr = queue.shift();
-            subGroup.push(group[curr]);
-            for (const neighbor of subAdj[curr]) {
-              if (!subVisited.has(neighbor)) {
-                subVisited.add(neighbor);
-                queue.push(neighbor);
-              }
+      if (group.length > 1) {
+        // Sub-cluster the group based on emotional distance (150px threshold)
+        const coords = group.map(m => getMemoryTargetCoordinate(m.emotions));
+        const subAdj = Array(group.length).fill(0).map(() => []);
+        
+        for (let i = 0; i < group.length; i++) {
+          for (let j = i + 1; j < group.length; j++) {
+            const dx = coords[i].x - coords[j].x;
+            const dy = coords[i].y - coords[j].y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist <= 150) { 
+              subAdj[i].push(j);
+              subAdj[j].push(i);
             }
           }
-          subGroups.push(subGroup);
+        }
+
+        const subVisited = new Set();
+        const subGroups = [];
+        for (let i = 0; i < group.length; i++) {
+          if (!subVisited.has(i)) {
+            const subGroup = [];
+            const queue = [i];
+            subVisited.add(i);
+            while (queue.length > 0) {
+              const curr = queue.shift();
+              subGroup.push(group[curr]);
+              for (const neighbor of subAdj[curr]) {
+                if (!subVisited.has(neighbor)) {
+                  subVisited.add(neighbor);
+                  queue.push(neighbor);
+                }
+              }
+            }
+            subGroups.push(subGroup);
+          }
+        }
+
+        const subHubs = [];
+        subGroups.forEach((sub, subIdx) => {
+          if (sub.length > 1) {
+            // Generate Black Hole Hub node
+            const subCoords = sub.map(m => getMemoryTargetCoordinate(m.emotions));
+            let sumX = 0, sumY = 0;
+            subCoords.forEach(c => { sumX += c.x; sumY += c.y; });
+            const targetX = sumX / subCoords.length;
+            const targetY = sumY / subCoords.length;
+
+            let coverMem = sub.find(m => m.advancedDetails?.isEntityCover) || sub[0];
+            let primaryColor = '#C8B6E2';
+            if (coverMem.emotions && coverMem.emotions.length > 0 && emotions[coverMem.emotions[0]]) {
+              primaryColor = emotions[coverMem.emotions[0]].color;
+            }
+            
+            const hubId = 'hub_' + coverMem.id + '_' + subIdx;
+            const hubNode = {
+              id: hubId,
+              name: (coverMem.advancedDetails?.entityName || 'Entity Hub') + ` (${sub.length} memories)`,
+              val: 4,
+              color: primaryColor,
+              isCluster: true, // Uses Canvas Image renderer
+              coverImageId: coverMem.id,
+              targetX,
+              targetY,
+              isHub: true
+            };
+            hubNodes.push(hubNode);
+            subHubs.push(hubNode);
+
+            // Create Spoke Links from each memory in this subGroup to its Hub
+            sub.forEach(mem => {
+               let mColor = '#C8B6E2';
+               if (mem.emotions && mem.emotions.length > 0 && emotions[mem.emotions[0]]) {
+                 mColor = emotions[mem.emotions[0]].color;
+               }
+               baseLinks.push({
+                 source: mem.id, 
+                 target: hubId,
+                 value: 200, // Strong gravity to orbit hub
+                 isSpoke: true,
+                 spokeColor: mColor
+               });
+            });
+          }
+        });
+
+        // Link fractured Hubs together with Gradients!
+        for (let i = 0; i < subHubs.length; i++) {
+          for (let j = i + 1; j < subHubs.length; j++) {
+            baseLinks.push({
+              source: subHubs[i].id,
+              target: subHubs[j].id,
+              value: 100, // Medium gravity to keep hubs near each other
+              isFractureLink: true,
+              colorA: subHubs[i].color,
+              colorB: subHubs[j].color
+            });
+          }
         }
       }
-
-      // Create Nodes for each subGroup
-      subGroups.forEach((sub, subIdx) => {
-        if (sub.length > 1) {
-          // Merge this subgroup into a Black Hole (it follows a trend!)
-          const subCoords = sub.map(m => getMemoryTargetCoordinate(m.emotions));
-          let sumX = 0, sumY = 0;
-          subCoords.forEach(c => { sumX += c.x; sumY += c.y; });
-          const targetX = sumX / subCoords.length;
-          const targetY = sumY / subCoords.length;
-
-          let coverMem = sub.find(m => m.advancedDetails?.isEntityCover) || sub[0];
-          let primaryColor = '#C8B6E2';
-          if (coverMem.emotions && coverMem.emotions.length > 0 && emotions[coverMem.emotions[0]]) {
-            primaryColor = emotions[coverMem.emotions[0]].color;
-          }
-
-          nodes.push({
-            // Ensure unique cluster ID in case one Entity fractures into multiple Black Holes
-            id: 'cluster_' + coverMem.id + '_' + subIdx, 
-            name: (coverMem.advancedDetails?.entityName || 'Merged Group') + ` (${sub.length} memories)`,
-            val: 3,
-            color: primaryColor,
-            isCluster: true,
-            coverImageId: coverMem.id,
-            mergedMemories: sub,
-            targetX,
-            targetY,
-            emotions: coverMem.emotions || [],
-            memory: coverMem
-          });
-        } else {
-          // Individual outlier node that did not fit the trend
-          const mem = sub[0];
-          let primaryColor = '#C8B6E2';
-          if (mem.emotions && mem.emotions.length > 0 && emotions[mem.emotions[0]]) {
-            primaryColor = emotions[mem.emotions[0]].color;
-          }
-          const targetCoord = getMemoryTargetCoordinate(mem.emotions);
-          
-          nodes.push({
-            id: mem.id,
-            name: mem.fileName,
-            val: 1.5,
-            color: primaryColor,
-            memory: mem,
-            emotions: mem.emotions || [],
-            category: mem.category,
-            subCategoryData: mem.subCategoryData || {},
-            targetX: targetCoord.x,
-            targetY: targetCoord.y,
-            isCluster: false
-          });
-        }
-      });
     });
 
-    // Create links between nodes
-    for (let i = 0; i < nodes.length; i++) {
-      for (let j = i + 1; j < nodes.length; j++) {
-        let weight = 0;
-        const n1 = nodes[i];
-        const n2 = nodes[j];
-        
-        if (n1.category && n1.category === n2.category) {
-          weight += 1;
-        }
+    // 4. Memory Stacking Logic
+    const finalNodes = [...hubNodes]; 
+    const coordMap = {};
+    rawNodes.forEach(node => {
+      const key = `${node.targetX.toFixed(1)},${node.targetY.toFixed(1)}`;
+      if (!coordMap[key]) coordMap[key] = [];
+      coordMap[key].push(node);
+    });
 
+    const idToStackMap = {};
+
+    Object.keys(coordMap).forEach(key => {
+      const stack = coordMap[key];
+      if (stack.length === 1) {
+        finalNodes.push(stack[0]);
+        idToStackMap[stack[0].id] = stack[0].id;
+      } else {
+        const stackId = 'stack_' + stack[0].id; 
+        stack.forEach(memNode => { idToStackMap[memNode.id] = stackId; });
+
+        if (expandedStacks.has(stackId)) {
+          // Burst them apart in a tight circle
+          const radius = 25;
+          stack.forEach((node, idx) => {
+            const angle = (idx / stack.length) * 2 * Math.PI;
+            // Shift their physics targets slightly so they stay apart
+            node.targetX += Math.cos(angle) * radius;
+            node.targetY += Math.sin(angle) * radius;
+            finalNodes.push(node);
+            idToStackMap[node.id] = node.id; // Un-mapped since they burst
+          });
+        } else {
+          // Single Stack Point Node
+          finalNodes.push({
+            id: stackId,
+            name: `${stack.length} Memories (Click to Split)`,
+            val: 2.5,
+            color: stack[0].color,
+            isStack: true,
+            targetX: stack[0].targetX,
+            targetY: stack[0].targetY,
+            stackedMemories: stack,
+            memory: stack[0].memory // representative memory
+          });
+        }
+      }
+    });
+
+    // Redirect links to point to Stack IDs if stacked
+    const redirectedLinks = baseLinks.map(link => ({
+      ...link,
+      source: idToStackMap[link.source] || link.source,
+      target: idToStackMap[link.target] || link.target
+    }));
+
+    // 5. Cross-Entity Relationship Links
+    // Iterate over final nodes (excluding hubs and stacks) to calculate relational gravity
+    for (let i = 0; i < rawNodes.length; i++) {
+      for (let j = i + 1; j < rawNodes.length; j++) {
+        let weight = 0;
+        const n1 = rawNodes[i];
+        const n2 = rawNodes[j];
+        
+        if (n1.category && n1.category === n2.category) weight += 1;
         const sharedEmotions = (n1.emotions || []).filter(e => (n2.emotions || []).includes(e));
         weight += sharedEmotions.length * 0.5;
 
         const advI = n1.memory?.advancedDetails || {};
         const advJ = n2.memory?.advancedDetails || {};
 
-        // Bidirectional Entity Relationship check
-        // Check if n1 defines a relationship with n2's entity
         let entityRelIntensity = 0;
         let hasEntityRel = false;
 
         if (advI.entityName && advJ.entityName) {
           const entityIName = advI.entityName.trim().toLowerCase();
           const entityJName = advJ.entityName.trim().toLowerCase();
-
           const relIJ = (advI.entityRelationships || []).find(r => r.targetEntity.trim().toLowerCase() === entityJName);
           const relJI = (advJ.entityRelationships || []).find(r => r.targetEntity.trim().toLowerCase() === entityIName);
 
           if (relIJ || relJI) {
             hasEntityRel = true;
-            // Average them if both define it, otherwise take the defined one
             if (relIJ && relJI) {
               entityRelIntensity = (relIJ.intensity + relJI.intensity) / 2;
             } else {
@@ -251,28 +303,28 @@ export default function NeuralNetworkMap({ memories, onNodeClick }) {
         }
 
         if (weight > 0 && hasEntityRel) {
-          // Multiply weight by the specific relationship intensity (e.g., up to 10x)
           weight *= (entityRelIntensity || 1);
         }
 
-        const hasExplicitLink = (advI.linkedMemories || []).includes(n2.memory?.id) || (advJ.linkedMemories || []).includes(n1.memory?.id);
-        const m2IsGroupOf1 = advJ.entityName && (advI.linkedMemories || []).includes(`GROUP:${advJ.entityName.trim()}`);
-        const m1IsGroupOf2 = advI.entityName && (advJ.linkedMemories || []).includes(`GROUP:${advI.entityName.trim()}`);
-        
-        const hasSharedEntity = advI.entityName && advJ.entityName && advI.entityName.trim().toLowerCase() === advJ.entityName.trim().toLowerCase();
-
-        if (hasExplicitLink || m2IsGroupOf1 || m1IsGroupOf2 || hasSharedEntity) {
-          weight += 100;
-        }
-
+        // If these memories are not already linked via Hub, create a weak general link
         if (weight > 0) {
-          links.push({ source: n1.id, target: n2.id, value: weight });
+          // Use redirected IDs so it targets the Stack if necessary
+          const srcId = idToStackMap[n1.id] || n1.id;
+          const tgtId = idToStackMap[n2.id] || n2.id;
+          // Prevent self-linking (e.g. if they are both in the same stack)
+          if (srcId !== tgtId) {
+            // Check if link already exists (from spokes etc)
+            const exists = redirectedLinks.some(l => (l.source === srcId && l.target === tgtId) || (l.source === tgtId && l.target === srcId));
+            if (!exists) {
+              redirectedLinks.push({ source: srcId, target: tgtId, value: weight });
+            }
+          }
         }
       }
     }
     
-    setGraphData({ nodes, links });
-  }, [memories]);
+    setGraphData({ nodes: finalNodes, links: redirectedLinks });
+  }, [memories, expandedStacks]);
 
   useEffect(() => {
     if (fgRef.current) {
@@ -280,21 +332,30 @@ export default function NeuralNetworkMap({ memories, onNodeClick }) {
         return 100 / (link.value || 1);
       });
       fgRef.current.d3Force('charge').strength(-150);
-      fgRef.current.d3Force('x', forceX(node => node.targetX || 0).strength(0.3));
-      fgRef.current.d3Force('y', forceY(node => node.targetY || 0).strength(0.3));
+      fgRef.current.d3Force('x', forceX(node => node.targetX || 0).strength(0.4));
+      fgRef.current.d3Force('y', forceY(node => node.targetY || 0).strength(0.4));
     }
   }, [graphData]);
 
   const nodeCanvasObject = (node, ctx, globalScale) => {
-    const size = node.isCluster ? 12 : 6;
+    let size = node.isCluster ? 14 : (node.isStack ? 8 : 6);
     
     ctx.beginPath();
     ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
-    ctx.shadowBlur = 15;
+    ctx.shadowBlur = node.isStack ? 20 : 15;
     ctx.shadowColor = node.color || '#C8B6E2';
     ctx.fillStyle = node.color || '#C8B6E2';
     ctx.fill();
     ctx.shadowBlur = 0;
+
+    if (node.isStack) {
+      // Draw a tiny plus or indicator inside the stack
+      ctx.fillStyle = '#000000';
+      ctx.font = `${size}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(node.stackedMemories.length, node.x, node.y);
+    }
     
     if (node.isCluster && node.coverImageId && images[node.coverImageId]) {
       const img = images[node.coverImageId];
@@ -308,8 +369,53 @@ export default function NeuralNetworkMap({ memories, onNodeClick }) {
     }
   };
 
+  const linkCanvasObject = (link, ctx, globalScale) => {
+    // Only custom draw Spoke Links or Fracture Links
+    if (!link.isSpoke && !link.isFractureLink) return false; // fallback to default drawing for others
+
+    const start = link.source;
+    const end = link.target;
+    
+    // Safety check if physics hasn't initialized coordinates yet
+    if (typeof start.x !== 'number' || typeof end.x !== 'number') return;
+
+    ctx.beginPath();
+    ctx.moveTo(start.x, start.y);
+    ctx.lineTo(end.x, end.y);
+    
+    if (link.isFractureLink) {
+      // Linear gradient between fractured hubs
+      const grad = ctx.createLinearGradient(start.x, start.y, end.x, end.y);
+      grad.addColorStop(0, link.colorA || '#FFFFFF');
+      grad.addColorStop(1, link.colorB || '#FFFFFF');
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = 3 / globalScale;
+    } else if (link.isSpoke) {
+      // Solid color matching the memory dot
+      ctx.strokeStyle = link.spokeColor;
+      ctx.globalAlpha = 0.6;
+      ctx.lineWidth = 1.5 / globalScale;
+    }
+
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    return true; // We handled the drawing
+  };
+
   const handleNodeClick = (node) => {
-    onNodeClick(node.memory);
+    if (node.isStack) {
+      // Burst the stack!
+      setExpandedStacks(prev => {
+        const next = new Set(prev);
+        next.add(node.id);
+        return next;
+      });
+    } else if (node.isHub) {
+      // Do nothing, hubs just represent groups
+    } else {
+      // Standard memory node
+      onNodeClick(node.memory);
+    }
   };
 
   if (!memories || memories.length === 0) {
@@ -328,9 +434,11 @@ export default function NeuralNetworkMap({ memories, onNodeClick }) {
         nodeLabel="name"
         nodeColor="color"
         nodeCanvasObject={nodeCanvasObject}
+        linkCanvasObjectMode={() => 'replace'}
+        linkCanvasObject={linkCanvasObject}
         onNodeClick={handleNodeClick}
-        linkColor={() => 'rgba(200, 182, 226, 0.2)'}
-        linkOpacity={0.2}
+        linkColor={() => 'rgba(200, 182, 226, 0.1)'} // Very faint default links
+        linkOpacity={0.1}
       />
     </div>
   );
