@@ -66,9 +66,9 @@ export default function AppContent({ view }) {
             
             <MemoryDetailsEditor 
               category={activeMemory.category}
-              setCategory={(c) => setActiveMemory({ ...activeMemory, category: c })}
+              setCategory={(c) => setActiveMemory(prev => ({ ...prev, category: c }))}
               subCategoryData={activeMemory.subCategoryData}
-              setSubCategoryData={(d) => typeof d === 'function' ? setActiveMemory(prev => ({ ...prev, subCategoryData: d(prev.subCategoryData) })) : setActiveMemory({ ...activeMemory, subCategoryData: d })}
+              setSubCategoryData={(d) => typeof d === 'function' ? setActiveMemory(prev => ({ ...prev, subCategoryData: d(prev.subCategoryData) })) : setActiveMemory(prev => ({ ...prev, subCategoryData: d }))}
               metadata={activeMemory.metadata}
             />
           </div>
