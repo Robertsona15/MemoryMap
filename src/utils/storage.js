@@ -18,17 +18,9 @@ export const STORE_KEY = 'memory-map-memories';
  * }
  */
 
-// Save a new or updated memory
 export async function getMemory(id) {
-  const db = await initDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORE_NAME], 'readonly');
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.get(id);
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+  const memories = await get(STORE_KEY) || [];
+  return memories.find(m => m.id === id) || null;
 }
 
 export async function saveMemory(memory) {

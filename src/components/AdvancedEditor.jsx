@@ -23,10 +23,14 @@ export default function AdvancedEditor() {
           return;
         }
         
-        // Ensure advancedDetails exists on older memories
-        if (!mem.advancedDetails) {
-          mem.advancedDetails = { relationshipIntensity: 5, entityName: '', linkedMemories: [], isEntityCover: false };
-        }
+        // Ensure advancedDetails structure is complete for older memories
+        mem.advancedDetails = {
+          relationshipIntensity: 5,
+          entityName: '',
+          linkedMemories: [],
+          isEntityCover: false,
+          ...(mem.advancedDetails || {})
+        };
         
         setMemory(mem);
         
