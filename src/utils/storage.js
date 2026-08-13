@@ -1,4 +1,4 @@
-import { get, set, update, del, keys } from 'idb-keyval';
+import { get, update } from 'idb-keyval';
 import { v4 as uuidv4 } from 'uuid';
 
 export const STORE_KEY = 'memory-map-memories';
