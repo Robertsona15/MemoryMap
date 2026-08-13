@@ -3,6 +3,25 @@ import Particles, { initParticlesEngine } from '@tsparticles/react';
 import { loadSlim } from '@tsparticles/slim';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 
+const particlesOptions = {
+  background: { color: { value: 'transparent' } },
+  fpsLimit: 120,
+  interactivity: {
+    events: { onHover: { enable: true, mode: 'repulse' } },
+    modes: { repulse: { distance: 100, duration: 0.4 } },
+  },
+  particles: {
+    color: { value: '#C8B6E2' },
+    links: { color: '#8A2BE2', distance: 150, enable: true, opacity: 0.2, width: 1 },
+    move: { direction: 'none', enable: true, outModes: { default: 'bounce' }, random: false, speed: 0.5, straight: false },
+    number: { density: { enable: true, area: 800 }, value: 80 },
+    opacity: { value: 0.3 },
+    shape: { type: 'circle' },
+    size: { value: { min: 1, max: 3 } },
+  },
+  detectRetina: true,
+};
+
 export default function Layout() {
   const [init, setInit] = useState(false);
   const location = useLocation();
@@ -14,25 +33,6 @@ export default function Layout() {
       setInit(true);
     });
   }, []);
-
-  const particlesOptions = {
-    background: { color: { value: 'transparent' } },
-    fpsLimit: 120,
-    interactivity: {
-      events: { onHover: { enable: true, mode: 'repulse' } },
-      modes: { repulse: { distance: 100, duration: 0.4 } },
-    },
-    particles: {
-      color: { value: '#C8B6E2' },
-      links: { color: '#8A2BE2', distance: 150, enable: true, opacity: 0.2, width: 1 },
-      move: { direction: 'none', enable: true, outModes: { default: 'bounce' }, random: false, speed: 0.5, straight: false },
-      number: { density: { enable: true, area: 800 }, value: 80 },
-      opacity: { value: 0.3 },
-      shape: { type: 'circle' },
-      size: { value: { min: 1, max: 3 } },
-    },
-    detectRetina: true,
-  };
 
   return (
     <div className="app-container">
