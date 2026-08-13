@@ -33,26 +33,32 @@ export default function NeuralNetworkMap({ memories, onNodeClick }) {
     return () => { active = false; };
   }, [memories]);
 
-  // Rebuild graph nodes and links whenever memories array changes
   useEffect(() => {
     const nodes = [];
     const links = [];
 
+    // Filter out memories that have no emotions
+    const mapMemories = memories.filter(m => m.emotions && m.emotions.length > 0);
+
     // 1. Build adjacency list for explicit grouping (Black Hole links)
     const adj = {};
-    memories.forEach(m => { adj[m.id] = new Set(); });
+    mapMemories.forEach(m => { adj[m.id] = new Set(); });
     
-    for (let i = 0; i < memories.length; i++) {
-      for (let j = i + 1; j < memories.length; j++) {
-        const m1 = memories[i];
-        const m2 = memories[j];
+    for (let i = 0; i < mapMemories.length; i++) {
+      for (let j = i + 1; j < mapMemories.length; j++) {
+        const m1 = mapMemories[i];
+        const m2 = mapMemories[j];
         const adv1 = m1.advancedDetails || {};
         const adv2 = m2.advancedDetails || {};
         
         const hasExplicitLink = (adv1.linkedMemories || []).includes(m2.id) || (adv2.linkedMemories || []).includes(m1.id);
+        const m2IsGroupOf1 = adv2.entityName && (adv1.linkedMemories || []).includes(`GROUP:${adv2.entityName.trim()}`);
+        const m1IsGroupOf2 = adv1.entityName && (adv2.linkedMemories || []).includes(`GROUP:${adv1.entityName.trim()}`);
+        const hasGroupExplicitLink = m2IsGroupOf1 || m1IsGroupOf2;
+        
         const hasSharedEntity = adv1.entityName && adv2.entityName && adv1.entityName.trim().toLowerCase() === adv2.entityName.trim().toLowerCase();
         
-        if (hasExplicitLink || hasSharedEntity) {
+        if (hasExplicitLink || hasGroupExplicitLink || hasSharedEntity) {
           adj[m1.id].add(m2.id);
           adj[m2.id].add(m1.id);
         }
@@ -62,14 +68,14 @@ export default function NeuralNetworkMap({ memories, onNodeClick }) {
     // 2. Find connected components (groups)
     const visited = new Set();
     const groups = [];
-    memories.forEach(m => {
+    mapMemories.forEach(m => {
       if (!visited.has(m.id)) {
         const group = [];
         const queue = [m.id];
         visited.add(m.id);
         while(queue.length > 0) {
           const curr = queue.shift();
-          group.push(memories.find(mem => mem.id === curr));
+          group.push(mapMemories.find(mem => mem.id === curr));
           for (const neighbor of adj[curr]) {
             if (!visited.has(neighbor)) {
               visited.add(neighbor);
@@ -188,16 +194,41 @@ export default function NeuralNetworkMap({ memories, onNodeClick }) {
         const advI = n1.memory?.advancedDetails || {};
         const advJ = n2.memory?.advancedDetails || {};
 
-        if (weight > 0) {
-          const intensityI = advI.relationshipIntensity || 5;
-          const intensityJ = advJ.relationshipIntensity || 5;
-          weight *= ((intensityI + intensityJ) / 10);
+        // Bidirectional Entity Relationship check
+        // Check if n1 defines a relationship with n2's entity
+        let entityRelIntensity = 0;
+        let hasEntityRel = false;
+
+        if (advI.entityName && advJ.entityName) {
+          const entityIName = advI.entityName.trim().toLowerCase();
+          const entityJName = advJ.entityName.trim().toLowerCase();
+
+          const relIJ = (advI.entityRelationships || []).find(r => r.targetEntity.trim().toLowerCase() === entityJName);
+          const relJI = (advJ.entityRelationships || []).find(r => r.targetEntity.trim().toLowerCase() === entityIName);
+
+          if (relIJ || relJI) {
+            hasEntityRel = true;
+            // Average them if both define it, otherwise take the defined one
+            if (relIJ && relJI) {
+              entityRelIntensity = (relIJ.intensity + relJI.intensity) / 2;
+            } else {
+              entityRelIntensity = relIJ ? relIJ.intensity : relJI.intensity;
+            }
+          }
+        }
+
+        if (weight > 0 && hasEntityRel) {
+          // Multiply weight by the specific relationship intensity (e.g., up to 10x)
+          weight *= (entityRelIntensity || 1);
         }
 
         const hasExplicitLink = (advI.linkedMemories || []).includes(n2.memory?.id) || (advJ.linkedMemories || []).includes(n1.memory?.id);
+        const m2IsGroupOf1 = advJ.entityName && (advI.linkedMemories || []).includes(`GROUP:${advJ.entityName.trim()}`);
+        const m1IsGroupOf2 = advI.entityName && (advJ.linkedMemories || []).includes(`GROUP:${advI.entityName.trim()}`);
+        
         const hasSharedEntity = advI.entityName && advJ.entityName && advI.entityName.trim().toLowerCase() === advJ.entityName.trim().toLowerCase();
 
-        if (hasExplicitLink || hasSharedEntity) {
+        if (hasExplicitLink || m2IsGroupOf1 || m1IsGroupOf2 || hasSharedEntity) {
           weight += 100;
         }
 

@@ -28,13 +28,51 @@ export default function AppContent({ view }) {
       category: '',
       subCategoryData: {},
       advancedDetails: {
-        relationshipIntensity: 5,
         entityName: '',
         linkedMemories: [],
-        isEntityCover: false
+        isEntityCover: false,
+        entityRelationships: []
       },
       notes: ''
     });
+  };
+
+  const handleBulkImport = async (dirHandle) => {
+    const newMemories = [];
+    
+    async function processDirectory(dir) {
+      for await (const entry of dir.values()) {
+        if (entry.kind === 'file') {
+          if (entry.name.match(/\.(jpg|jpeg|png|webp|gif|heic)$/i)) {
+            const mem = {
+              fileHandle: entry,
+              fileName: entry.name,
+              emotions: [],
+              category: '',
+              subCategoryData: {},
+              advancedDetails: {
+                entityName: '',
+                linkedMemories: [],
+                isEntityCover: false,
+                entityRelationships: []
+              },
+              notes: '',
+              metadata: { locationStr: '', date: '' }
+            };
+            const savedMem = await saveMemory(mem);
+            newMemories.push(savedMem);
+          }
+        } else if (entry.kind === 'directory') {
+          await processDirectory(entry);
+        }
+      }
+    }
+    
+    await processDirectory(dirHandle);
+    
+    const updatedMemories = await getAllMemories();
+    setMemories(updatedMemories);
+    navigate('/gallery');
   };
 
   const handleSaveMemory = async () => {
@@ -118,8 +156,8 @@ export default function AppContent({ view }) {
 
       {/* Main View Area */}
       {!activeMemory && (
-        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          <PhotoPicker onPhotoSelect={handlePhotoSelect} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          <PhotoPicker onPhotoSelect={handlePhotoSelect} onBulkImport={handleBulkImport} />
           
           {memories.length > 0 && view === 'map' && (
             <NeuralNetworkMap memories={memories} onNodeClick={(mem) => setActiveMemory(mem)} />

@@ -4,7 +4,7 @@ import { UploadCloud } from 'lucide-react';
 
 const geocodeCache = new Map();
 
-export default function PhotoPicker({ onPhotoSelect }) {
+export default function PhotoPicker({ onPhotoSelect, onBulkImport }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
 
@@ -80,27 +80,62 @@ export default function PhotoPicker({ onPhotoSelect }) {
     }
   };
 
+  const handleFolderSelect = async () => {
+    try {
+      setIsProcessing(true);
+      setError(null);
+      const dirHandle = await window.showDirectoryPicker();
+      if (onBulkImport) {
+        await onBulkImport(dirHandle);
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        setError(err.message);
+        console.error("Error picking directory:", err);
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return (
-    <div 
-      className="glass-panel glow-hover" 
-      onClick={handleSelectPhoto}
-      style={{
-        padding: '3rem',
-        cursor: 'pointer',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '1rem',
-        minHeight: '200px'
-      }}
-    >
-      <UploadCloud size={48} color="var(--color-primary)" />
-      <h3 style={{ color: 'var(--color-text)' }}>Select a Memory</h3>
-      <p style={{ color: 'var(--color-text-muted)', textAlign: 'center' }}>
-        {isProcessing ? 'Processing cosmic dust...' : 'Click to choose a photo from your local universe.'}
-      </p>
-      {error && <p style={{ color: '#F44336' }}>{error}</p>}
+    <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center' }}>
+      <h2 style={{ color: 'white', marginBottom: '1rem', textShadow: '0 0 10px rgba(255,255,255,0.5)' }}>Add to your Memory Map</h2>
+      <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+        <button 
+          onClick={handleSelectPhoto}
+          disabled={isProcessing}
+          style={{
+            padding: '1rem 2rem',
+            fontSize: '1.2rem',
+            borderRadius: 'var(--radius)',
+            border: 'none',
+            background: 'var(--color-primary)',
+            color: 'white',
+            cursor: isProcessing ? 'not-allowed' : 'pointer',
+            boxShadow: '0 0 15px var(--color-glow)'
+          }}
+        >
+          {isProcessing ? 'Processing...' : 'Select Photo'}
+        </button>
+
+        <button 
+          onClick={handleFolderSelect}
+          disabled={isProcessing}
+          style={{
+            padding: '1rem 2rem',
+            fontSize: '1.2rem',
+            borderRadius: 'var(--radius)',
+            border: '1px solid var(--color-primary)',
+            background: 'transparent',
+            color: 'var(--color-primary)',
+            cursor: isProcessing ? 'not-allowed' : 'pointer'
+          }}
+        >
+          Import Folder
+        </button>
+      </div>
+      {error && <p style={{ color: '#F44336', marginTop: '1rem' }}>{error}</p>}
     </div>
   );
 }
