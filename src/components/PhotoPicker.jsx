@@ -2,16 +2,24 @@ import { useState } from 'react';
 import exifr from 'exifr';
 import { UploadCloud } from 'lucide-react';
 
+const geocodeCache = new Map();
+
 export default function PhotoPicker({ onPhotoSelect }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
 
   const reverseGeocode = async (latitude, longitude) => {
+    const cacheKey = `${latitude},${longitude}`;
+    if (geocodeCache.has(cacheKey)) {
+      return geocodeCache.get(cacheKey);
+    }
+
     try {
       // Using OpenStreetMap Nominatim for free client-side reverse geocoding
       const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`);
       const data = await res.json();
       if (data && data.display_name) {
+        geocodeCache.set(cacheKey, data.display_name);
         return data.display_name;
       }
     } catch (err) {
