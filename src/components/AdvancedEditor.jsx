@@ -25,7 +25,7 @@ export default function AdvancedEditor() {
         
         // Ensure advancedDetails exists on older memories
         if (!mem.advancedDetails) {
-          mem.advancedDetails = { relationshipIntensity: 5, entityName: '', linkedMemories: [] };
+          mem.advancedDetails = { relationshipIntensity: 5, entityName: '', linkedMemories: [], isEntityCover: false };
         }
         
         setMemory(mem);
@@ -125,8 +125,21 @@ export default function AdvancedEditor() {
                 ...memory,
                 advancedDetails: { ...memory.advancedDetails, entityName: e.target.value }
               })}
-              style={{ width: '100%', padding: '0.8rem', borderRadius: '5px', border: '1px solid var(--color-border)', background: 'rgba(255,255,255,0.05)', color: 'white', fontFamily: 'var(--font-body)' }}
+              style={{ width: '100%', padding: '0.8rem', borderRadius: '5px', border: '1px solid var(--color-border)', background: 'rgba(255,255,255,0.05)', color: 'white', fontFamily: 'var(--font-body)', marginBottom: '1rem' }}
             />
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-text)', cursor: 'pointer' }}>
+              <input 
+                type="checkbox" 
+                checked={memory.advancedDetails.isEntityCover || false}
+                onChange={(e) => setMemory({
+                  ...memory,
+                  advancedDetails: { ...memory.advancedDetails, isEntityCover: e.target.checked }
+                })}
+                style={{ width: '1.2rem', height: '1.2rem', accentColor: 'var(--color-primary)' }}
+              />
+              Use this photo as the Cover Image for the Black Hole cluster
+            </label>
           </div>
 
           {/* Memory Linking */}

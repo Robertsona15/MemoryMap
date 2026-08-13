@@ -30,7 +30,8 @@ export default function AppContent({ view }) {
       advancedDetails: {
         relationshipIntensity: 5,
         entityName: '',
-        linkedMemories: []
+        linkedMemories: [],
+        isEntityCover: false
       },
       notes: ''
     });

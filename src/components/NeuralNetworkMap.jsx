@@ -3,155 +3,270 @@ import { forceX, forceY } from 'd3-force';
 import ForceGraph2D from 'react-force-graph-2d';
 import { emotions } from '../data/schema';
 import { getMemoryTargetCoordinate } from '../utils/math';
+import { getFileUrlFromHandle } from '../utils/storage';
 
 export default function NeuralNetworkMap({ memories, onNodeClick }) {
   const fgRef = useRef();
-  const [dimensions, setDimensions] = useState({ width: 800, height: 400 });
+  const [graphData, setGraphData] = useState({ nodes: [], links: [] });
+  const [images, setImages] = useState({});
 
+  // Asynchronously load images for canvas rendering
   useEffect(() => {
-    // Basic responsive sizing for the container
-    const updateDimensions = () => {
-      const container = document.getElementById('map-container');
-      if (container) {
-        setDimensions({
-          width: container.clientWidth,
-          height: container.clientHeight
-        });
+    let active = true;
+    async function loadImages() {
+      const newImages = { ...images };
+      for (const mem of memories) {
+        if (!newImages[mem.id] && mem.fileHandle) {
+          try {
+             const url = await getFileUrlFromHandle(mem.fileHandle);
+             const img = new Image();
+             img.src = url;
+             newImages[mem.id] = img;
+          } catch (e) {
+             console.error("Failed to load image for graph", e);
+          }
+        }
       }
-    };
-    
-    window.addEventListener('resize', updateDimensions);
-    updateDimensions();
-    
-    return () => window.removeEventListener('resize', updateDimensions);
-  }, []);
+      if (active) setImages(newImages);
+    }
+    loadImages();
+    return () => { active = false; };
+  }, [memories]);
 
-  const graphData = useMemo(() => {
+  // Rebuild graph nodes and links whenever memories array changes
+  useEffect(() => {
     const nodes = [];
     const links = [];
 
-    // Map each memory to a node
-    memories.forEach(mem => {
-      // Find the primary emotion color (just use the first selected emotion for coloring)
-      let primaryColor = '#FFFFFF'; // default
-      if (mem.emotions && mem.emotions.length > 0) {
-        const mainEmotionKey = mem.emotions[0];
-        if (emotions[mainEmotionKey]) {
-          primaryColor = emotions[mainEmotionKey].color;
-        }
-      }
-
-      // Compute target plotting coordinate based on emotion vectors
-      const targetCoord = getMemoryTargetCoordinate(mem.emotions);
-
-      nodes.push({
-        id: mem.id,
-        name: mem.fileName,
-        val: 1.5,
-        color: primaryColor,
-        memory: mem,
-        emotions: mem.emotions || [],
-        category: mem.category,
-        subCategoryData: mem.subCategoryData || {},
-        targetX: targetCoord.x,
-        targetY: targetCoord.y
-      });
-    });
-
-    // Create links between nodes based on shared characteristics
-    for (let i = 0; i < nodes.length; i++) {
-      for (let j = i + 1; j < nodes.length; j++) {
-        const nodeA = nodes[i];
-        const nodeB = nodes[j];
+    // 1. Build adjacency list for explicit grouping (Black Hole links)
+    const adj = {};
+    memories.forEach(m => { adj[m.id] = new Set(); });
+    
+    for (let i = 0; i < memories.length; i++) {
+      for (let j = i + 1; j < memories.length; j++) {
+        const m1 = memories[i];
+        const m2 = memories[j];
+        const adv1 = m1.advancedDetails || {};
+        const adv2 = m2.advancedDetails || {};
         
-        let linkWeight = 0;
-        let reasons = [];
-
-        // 1. Primary Gravity: Shared emotions
-        const sharedEmotions = nodeA.emotions.filter(e => nodeB.emotions.includes(e));
-        if (sharedEmotions.length > 0) {
-          linkWeight += sharedEmotions.length * 2;
-          reasons.push('shared emotion');
-        }
-
-        // 2. Secondary Gravity: Related Details
-        if (nodeA.category && nodeA.category === nodeB.category) {
-          // Both are same category (e.g. 'person')
-          linkWeight += 1;
-          
-          if (nodeA.category === 'person') {
-            if (nodeA.subCategoryData.relationship && nodeA.subCategoryData.relationship === nodeB.subCategoryData.relationship) {
-              linkWeight += 3;
-              reasons.push('same relationship');
-            }
-          } else {
-            // Place, object, concept, pet
-            if (nodeA.subCategoryData.characteristics && 
-                nodeA.subCategoryData.characteristics.toLowerCase() === nodeB.subCategoryData.characteristics?.toLowerCase()) {
-              linkWeight += 3;
-              reasons.push('same details');
-            }
-          }
-        }
-
-        // Shared location metadata
-        if (nodeA.memory.metadata?.locationStr && 
-            nodeA.memory.metadata?.locationStr === nodeB.memory.metadata?.locationStr) {
-          linkWeight += 3;
-          reasons.push('same location');
-        }
-
-        if (linkWeight > 0) {
-          links.push({
-            source: nodeA.id,
-            target: nodeB.id,
-            value: linkWeight,
-            reasons: reasons.join(', ')
-          });
+        const hasExplicitLink = (adv1.linkedMemories || []).includes(m2.id) || (adv2.linkedMemories || []).includes(m1.id);
+        const hasSharedEntity = adv1.entityName && adv2.entityName && adv1.entityName.trim().toLowerCase() === adv2.entityName.trim().toLowerCase();
+        
+        if (hasExplicitLink || hasSharedEntity) {
+          adj[m1.id].add(m2.id);
+          adj[m2.id].add(m1.id);
         }
       }
     }
 
-    return { nodes, links };
+    // 2. Find connected components (groups)
+    const visited = new Set();
+    const groups = [];
+    memories.forEach(m => {
+      if (!visited.has(m.id)) {
+        const group = [];
+        const queue = [m.id];
+        visited.add(m.id);
+        while(queue.length > 0) {
+          const curr = queue.shift();
+          group.push(memories.find(mem => mem.id === curr));
+          for (const neighbor of adj[curr]) {
+            if (!visited.has(neighbor)) {
+              visited.add(neighbor);
+              queue.push(neighbor);
+            }
+          }
+        }
+        groups.push(group);
+      }
+    });
+
+    // 3. Process groups to create Nodes (and merge into Black Holes if close)
+    groups.forEach(group => {
+      if (group.length === 1) {
+        // Ungrouped memory
+        const mem = group[0];
+        let primaryColor = '#C8B6E2';
+        if (mem.emotions && mem.emotions.length > 0) {
+          const emKey = mem.emotions[0];
+          if (emotions[emKey]) primaryColor = emotions[emKey].color;
+        }
+        const targetCoord = getMemoryTargetCoordinate(mem.emotions);
+        
+        nodes.push({
+          id: mem.id,
+          name: mem.fileName,
+          val: 1.5,
+          color: primaryColor,
+          memory: mem,
+          emotions: mem.emotions || [],
+          category: mem.category,
+          subCategoryData: mem.subCategoryData || {},
+          targetX: targetCoord.x,
+          targetY: targetCoord.y,
+          isCluster: false
+        });
+      } else {
+        // Grouped memories: Check if they are close enough to merge
+        let maxDist = 0;
+        const coords = group.map(m => getMemoryTargetCoordinate(m.emotions));
+        
+        for (let i = 0; i < coords.length; i++) {
+          for (let j = i + 1; j < coords.length; j++) {
+            const dx = coords[i].x - coords[j].x;
+            const dy = coords[i].y - coords[j].y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist > maxDist) maxDist = dist;
+          }
+        }
+
+        if (maxDist < 150) {
+          // MERGE into a Black Hole
+          let sumX = 0, sumY = 0;
+          coords.forEach(c => { sumX += c.x; sumY += c.y; });
+          const targetX = sumX / coords.length;
+          const targetY = sumY / coords.length;
+
+          let coverMem = group.find(m => m.advancedDetails?.isEntityCover) || group[0];
+          let primaryColor = '#C8B6E2';
+          if (coverMem.emotions && coverMem.emotions.length > 0 && emotions[coverMem.emotions[0]]) {
+            primaryColor = emotions[coverMem.emotions[0]].color;
+          }
+
+          nodes.push({
+            id: 'cluster_' + coverMem.id,
+            name: (coverMem.advancedDetails?.entityName || 'Merged Group') + ` (${group.length} memories)`,
+            val: 3,
+            color: primaryColor,
+            isCluster: true,
+            coverImageId: coverMem.id,
+            mergedMemories: group,
+            targetX,
+            targetY,
+            emotions: coverMem.emotions || [],
+            memory: coverMem
+          });
+        } else {
+          group.forEach(mem => {
+            let primaryColor = '#C8B6E2';
+            if (mem.emotions && mem.emotions.length > 0 && emotions[mem.emotions[0]]) {
+              primaryColor = emotions[mem.emotions[0]].color;
+            }
+            const targetCoord = getMemoryTargetCoordinate(mem.emotions);
+            nodes.push({
+              id: mem.id,
+              name: mem.fileName,
+              val: 1.5,
+              color: primaryColor,
+              memory: mem,
+              emotions: mem.emotions || [],
+              category: mem.category,
+              subCategoryData: mem.subCategoryData || {},
+              targetX: targetCoord.x,
+              targetY: targetCoord.y,
+              isCluster: false
+            });
+          });
+        }
+      }
+    });
+
+    // Create links between nodes
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        let weight = 0;
+        const n1 = nodes[i];
+        const n2 = nodes[j];
+        
+        if (n1.category && n1.category === n2.category) {
+          weight += 1;
+        }
+
+        const sharedEmotions = (n1.emotions || []).filter(e => (n2.emotions || []).includes(e));
+        weight += sharedEmotions.length * 0.5;
+
+        const advI = n1.memory?.advancedDetails || {};
+        const advJ = n2.memory?.advancedDetails || {};
+
+        if (weight > 0) {
+          const intensityI = advI.relationshipIntensity || 5;
+          const intensityJ = advJ.relationshipIntensity || 5;
+          weight *= ((intensityI + intensityJ) / 10);
+        }
+
+        const hasExplicitLink = (advI.linkedMemories || []).includes(n2.memory?.id) || (advJ.linkedMemories || []).includes(n1.memory?.id);
+        const hasSharedEntity = advI.entityName && advJ.entityName && advI.entityName.trim().toLowerCase() === advJ.entityName.trim().toLowerCase();
+
+        if (hasExplicitLink || hasSharedEntity) {
+          weight += 100;
+        }
+
+        if (weight > 0) {
+          links.push({ source: n1.id, target: n2.id, value: weight });
+        }
+      }
+    }
+    
+    setGraphData({ nodes, links });
   }, [memories]);
 
   useEffect(() => {
-    // Apply custom forces based on emotion coordinates and relationship links
     if (fgRef.current) {
       fgRef.current.d3Force('link').distance(link => {
-        // Stronger connections (higher value) = shorter distance
         return 100 / (link.value || 1);
       });
-      fgRef.current.d3Force('charge').strength(-150); // Repel nodes slightly
-
-      // Apply gravitational pull towards the emotion-based target coordinates
+      fgRef.current.d3Force('charge').strength(-150);
       fgRef.current.d3Force('x', forceX(node => node.targetX || 0).strength(0.3));
       fgRef.current.d3Force('y', forceY(node => node.targetY || 0).strength(0.3));
     }
   }, [graphData]);
 
+  const nodeCanvasObject = (node, ctx, globalScale) => {
+    const size = node.isCluster ? 12 : 6;
+    
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = node.color || '#C8B6E2';
+    ctx.fillStyle = node.color || '#C8B6E2';
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    
+    if (node.isCluster && node.coverImageId && images[node.coverImageId]) {
+      const img = images[node.coverImageId];
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, size, 0, Math.PI * 2, true);
+      ctx.closePath();
+      ctx.clip();
+      ctx.drawImage(img, node.x - size, node.y - size, size * 2, size * 2);
+      ctx.restore();
+    }
+  };
+
+  const handleNodeClick = (node) => {
+    onNodeClick(node.memory);
+  };
+
   if (!memories || memories.length === 0) {
     return (
-      <div id="map-container" className="glass-panel" style={{ width: '100%', height: '400px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      <div className="glass-panel" style={{ width: '100%', height: '400px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
         <p style={{ color: 'var(--color-text-muted)' }}>Add memories to construct your neural network.</p>
       </div>
     );
   }
 
   return (
-    <div id="map-container" className="glass-panel glow-hover" style={{ width: '100%', height: '400px', overflow: 'hidden' }}>
+    <div style={{ height: '70vh', width: '100%', background: 'rgba(0,0,0,0.3)', borderRadius: 'var(--radius)', border: '1px solid var(--color-border)', overflow: 'hidden' }}>
       <ForceGraph2D
         ref={fgRef}
-        width={dimensions.width}
-        height={dimensions.height}
         graphData={graphData}
         nodeLabel="name"
         nodeColor="color"
-        nodeRelSize={6}
-        linkColor={() => 'rgba(138, 43, 226, 0.4)'}
-        linkWidth={link => Math.min(link.value, 4)} // thicker lines for stronger connections
-        onNodeClick={(node) => onNodeClick && onNodeClick(node.memory)}
-        backgroundColor="transparent"
+        nodeCanvasObject={nodeCanvasObject}
+        onNodeClick={handleNodeClick}
+        linkColor={() => 'rgba(200, 182, 226, 0.2)'}
+        linkOpacity={0.2}
       />
     </div>
   );
