@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getAllMemories, saveMemory, deleteMemory } from './utils/storage';
 import PhotoPicker from './components/PhotoPicker';
 import EmotionTagger from './components/EmotionTagger';
@@ -7,6 +8,7 @@ import NeuralNetworkMap from './components/NeuralNetworkMap';
 import PhotoGallery from './components/PhotoGallery';
 
 export default function AppContent({ view }) {
+  const navigate = useNavigate();
   const [memories, setMemories] = useState([]);
   const [activeMemory, setActiveMemory] = useState(null); // The memory currently being edited/added
 
@@ -25,6 +27,11 @@ export default function AppContent({ view }) {
       emotions: [],
       category: '',
       subCategoryData: {},
+      advancedDetails: {
+        relationshipIntensity: 5,
+        entityName: '',
+        linkedMemories: []
+      },
       notes: ''
     });
   };
@@ -74,6 +81,18 @@ export default function AppContent({ view }) {
           </div>
           
           <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+            <button 
+              onClick={async () => {
+                let memToRoute = activeMemory;
+                if (!memToRoute.id) {
+                  memToRoute = await saveMemory(activeMemory);
+                }
+                navigate(`/editor/${memToRoute.id}`);
+              }}
+              style={{ padding: '0.8rem 1.5rem', borderRadius: 'var(--radius)', background: 'transparent', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', cursor: 'pointer', fontWeight: 'bold' }}
+            >
+              Advanced Mode
+            </button>
             {activeMemory.id && (
               <button 
                 onClick={async () => {

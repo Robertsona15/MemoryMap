@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
-import AppContent from './AppContent'; // We'll extract App logic here
+import AppContent from './AppContent';
+import AdvancedEditor from './components/AdvancedEditor'; // We'll extract App logic here
 
 export default function App() {
   return (
@@ -10,6 +11,7 @@ export default function App() {
           <Route index element={<Navigate to="/map" replace />} />
           <Route path="map" element={<AppContent view="map" />} />
           <Route path="gallery" element={<AppContent view="gallery" />} />
+          <Route path="editor/:id" element={<AdvancedEditor />} />
         </Route>
       </Routes>
     </BrowserRouter>

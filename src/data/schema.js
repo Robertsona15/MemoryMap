@@ -52,3 +52,34 @@ export const relationshipTypes = [
   'Acquaintance',
   'Stranger'
 ];
+
+// Plutchik's 24 Compound Emotions (Dyads)
+export const compoundEmotions = [
+  // Primary Dyads (adjacent)
+  { id: 'love', label: 'Love', components: ['Joy', 'Trust'] },
+  { id: 'submission', label: 'Submission', components: ['Trust', 'Fear'] },
+  { id: 'alarm', label: 'Alarm', components: ['Fear', 'Surprise'] },
+  { id: 'disappointment', label: 'Disappointment', components: ['Surprise', 'Sadness'] },
+  { id: 'remorse', label: 'Remorse', components: ['Sadness', 'Disgust'] },
+  { id: 'contempt', label: 'Contempt', components: ['Disgust', 'Anger'] },
+  { id: 'aggressiveness', label: 'Aggressiveness', components: ['Anger', 'Anticipation'] },
+  { id: 'optimism', label: 'Optimism', components: ['Anticipation', 'Joy'] },
+  // Secondary Dyads (1 emotion apart)
+  { id: 'guilt', label: 'Guilt', components: ['Joy', 'Fear'] },
+  { id: 'curiosity', label: 'Curiosity', components: ['Trust', 'Surprise'] },
+  { id: 'despair', label: 'Despair', components: ['Fear', 'Sadness'] },
+  { id: 'unbelief', label: 'Unbelief', components: ['Surprise', 'Disgust'] },
+  { id: 'envy', label: 'Envy', components: ['Sadness', 'Anger'] },
+  { id: 'cynicism', label: 'Cynicism', components: ['Disgust', 'Anticipation'] },
+  { id: 'pride', label: 'Pride', components: ['Anger', 'Joy'] },
+  { id: 'fatalism', label: 'Fatalism', components: ['Anticipation', 'Trust'] },
+  // Tertiary Dyads (2 emotions apart)
+  { id: 'delight', label: 'Delight', components: ['Joy', 'Surprise'] },
+  { id: 'sentimentality', label: 'Sentimentality', components: ['Trust', 'Sadness'] },
+  { id: 'shame', label: 'Shame', components: ['Fear', 'Disgust'] },
+  { id: 'outrage', label: 'Outrage', components: ['Surprise', 'Anger'] },
+  { id: 'pessimism', label: 'Pessimism', components: ['Sadness', 'Anticipation'] },
+  { id: 'morbidness', label: 'Morbidness', components: ['Disgust', 'Joy'] },
+  { id: 'dominance', label: 'Dominance', components: ['Anger', 'Trust'] },
+  { id: 'anxiety', label: 'Anxiety', components: ['Anticipation', 'Fear'] }
+];

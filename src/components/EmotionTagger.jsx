@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { emotions, coreEmotionTypes } from '../data/schema';
+import { emotions, coreEmotionTypes, compoundEmotions } from '../data/schema';
 
 export default function EmotionTagger({ selectedEmotions, onChange }) {
   // selectedEmotions is an array of emotion keys, e.g. ['joy', 'ecstasy']
@@ -36,6 +36,22 @@ export default function EmotionTagger({ selectedEmotions, onChange }) {
   const hasSelectedEmotionsInType = (type) => {
     return emotionsByType[type].some(e => selectedEmotions.includes(e.key));
   };
+
+  const getBaseColorForType = (type) => {
+    const ems = emotionsByType[type];
+    if (!ems) return '#FFFFFF';
+    const baseEm = ems.find(e => e.level === 2) || ems[0];
+    return baseEm.color;
+  };
+
+  // Determine which compound emotions should be visible
+  const visibleCompounds = useMemo(() => {
+    return compoundEmotions.filter(c => {
+      // Visible if already selected OR if both its component types have at least one selection
+      return selectedEmotions.includes(c.id) || 
+             (hasSelectedEmotionsInType(c.components[0]) && hasSelectedEmotionsInType(c.components[1]));
+    });
+  }, [selectedEmotions, hasSelectedEmotionsInType]);
 
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -100,6 +116,43 @@ export default function EmotionTagger({ selectedEmotions, onChange }) {
               </button>
             );
           })}
+        </div>
+      )}
+
+      {/* Compound Emotions Section */}
+      {visibleCompounds.length > 0 && (
+        <div style={{ marginTop: '1rem' }}>
+          <h4 style={{ color: 'var(--color-secondary)', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Compound Emotions</h4>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+            {visibleCompounds.map(compound => {
+              const isSelected = selectedEmotions.includes(compound.id);
+              const color1 = getBaseColorForType(compound.components[0]);
+              const color2 = getBaseColorForType(compound.components[1]);
+              const gradient = `linear-gradient(135deg, ${color1} 0%, ${color2} 100%)`;
+
+              return (
+                <button
+                  key={compound.id}
+                  onClick={() => handleToggleEmotion(compound.id)}
+                  style={{
+                    background: isSelected ? gradient : 'transparent',
+                    color: isSelected ? '#000' : 'var(--color-text)',
+                    border: `1px solid ${isSelected ? 'transparent' : 'var(--color-border)'}`,
+                    borderImage: isSelected ? 'none' : `${gradient} 1`,
+                    padding: '0.4rem 0.8rem',
+                    borderRadius: '15px',
+                    cursor: 'pointer',
+                    boxShadow: isSelected ? `0 0 15px ${color1}` : 'none', // Glow using color1
+                    transition: 'all 0.2s',
+                    fontFamily: 'var(--font-body)',
+                    fontWeight: isSelected ? '700' : '500'
+                  }}
+                >
+                  {compound.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
