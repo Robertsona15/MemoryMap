@@ -87,10 +87,10 @@ export default function NeuralNetworkMap({ memories, onNodeClick }) {
       }
     });
 
-    // 3. Process groups to create Nodes (and merge into Black Holes if close)
+    // 3. Process groups to create Nodes (and sub-cluster them based on emotional trend)
     groups.forEach(group => {
       if (group.length === 1) {
-        // Ungrouped memory
+        // Ungrouped memory (or isolated group)
         const mem = group[0];
         let primaryColor = '#C8B6E2';
         if (mem.emotions && mem.emotions.length > 0) {
@@ -112,69 +112,102 @@ export default function NeuralNetworkMap({ memories, onNodeClick }) {
           targetY: targetCoord.y,
           isCluster: false
         });
-      } else {
-        // Grouped memories: Check if they are close enough to merge
-        let maxDist = 0;
-        const coords = group.map(m => getMemoryTargetCoordinate(m.emotions));
-        
-        for (let i = 0; i < coords.length; i++) {
-          for (let j = i + 1; j < coords.length; j++) {
-            const dx = coords[i].x - coords[j].x;
-            const dy = coords[i].y - coords[j].y;
-            const dist = Math.sqrt(dx*dx + dy*dy);
-            if (dist > maxDist) maxDist = dist;
+        return;
+      }
+
+      // Group has > 1 memory. Sub-cluster them based on distance (emotional trend)
+      const coords = group.map(m => getMemoryTargetCoordinate(m.emotions));
+      const subAdj = Array(group.length).fill(0).map(() => []);
+      
+      for (let i = 0; i < group.length; i++) {
+        for (let j = i + 1; j < group.length; j++) {
+          const dx = coords[i].x - coords[j].x;
+          const dy = coords[i].y - coords[j].y;
+          const dist = Math.sqrt(dx*dx + dy*dy);
+          // 150 pixel threshold for "sharing a trend"
+          if (dist <= 150) { 
+            subAdj[i].push(j);
+            subAdj[j].push(i);
           }
         }
+      }
 
-        if (maxDist < 150) {
-          // MERGE into a Black Hole
+      // Find connected components within the subAdj
+      const subVisited = new Set();
+      const subGroups = [];
+      for (let i = 0; i < group.length; i++) {
+        if (!subVisited.has(i)) {
+          const subGroup = [];
+          const queue = [i];
+          subVisited.add(i);
+          while (queue.length > 0) {
+            const curr = queue.shift();
+            subGroup.push(group[curr]);
+            for (const neighbor of subAdj[curr]) {
+              if (!subVisited.has(neighbor)) {
+                subVisited.add(neighbor);
+                queue.push(neighbor);
+              }
+            }
+          }
+          subGroups.push(subGroup);
+        }
+      }
+
+      // Create Nodes for each subGroup
+      subGroups.forEach((sub, subIdx) => {
+        if (sub.length > 1) {
+          // Merge this subgroup into a Black Hole (it follows a trend!)
+          const subCoords = sub.map(m => getMemoryTargetCoordinate(m.emotions));
           let sumX = 0, sumY = 0;
-          coords.forEach(c => { sumX += c.x; sumY += c.y; });
-          const targetX = sumX / coords.length;
-          const targetY = sumY / coords.length;
+          subCoords.forEach(c => { sumX += c.x; sumY += c.y; });
+          const targetX = sumX / subCoords.length;
+          const targetY = sumY / subCoords.length;
 
-          let coverMem = group.find(m => m.advancedDetails?.isEntityCover) || group[0];
+          let coverMem = sub.find(m => m.advancedDetails?.isEntityCover) || sub[0];
           let primaryColor = '#C8B6E2';
           if (coverMem.emotions && coverMem.emotions.length > 0 && emotions[coverMem.emotions[0]]) {
             primaryColor = emotions[coverMem.emotions[0]].color;
           }
 
           nodes.push({
-            id: 'cluster_' + coverMem.id,
-            name: (coverMem.advancedDetails?.entityName || 'Merged Group') + ` (${group.length} memories)`,
+            // Ensure unique cluster ID in case one Entity fractures into multiple Black Holes
+            id: 'cluster_' + coverMem.id + '_' + subIdx, 
+            name: (coverMem.advancedDetails?.entityName || 'Merged Group') + ` (${sub.length} memories)`,
             val: 3,
             color: primaryColor,
             isCluster: true,
             coverImageId: coverMem.id,
-            mergedMemories: group,
+            mergedMemories: sub,
             targetX,
             targetY,
             emotions: coverMem.emotions || [],
             memory: coverMem
           });
         } else {
-          group.forEach(mem => {
-            let primaryColor = '#C8B6E2';
-            if (mem.emotions && mem.emotions.length > 0 && emotions[mem.emotions[0]]) {
-              primaryColor = emotions[mem.emotions[0]].color;
-            }
-            const targetCoord = getMemoryTargetCoordinate(mem.emotions);
-            nodes.push({
-              id: mem.id,
-              name: mem.fileName,
-              val: 1.5,
-              color: primaryColor,
-              memory: mem,
-              emotions: mem.emotions || [],
-              category: mem.category,
-              subCategoryData: mem.subCategoryData || {},
-              targetX: targetCoord.x,
-              targetY: targetCoord.y,
-              isCluster: false
-            });
+          // Individual outlier node that did not fit the trend
+          const mem = sub[0];
+          let primaryColor = '#C8B6E2';
+          if (mem.emotions && mem.emotions.length > 0 && emotions[mem.emotions[0]]) {
+            primaryColor = emotions[mem.emotions[0]].color;
+          }
+          const targetCoord = getMemoryTargetCoordinate(mem.emotions);
+          
+          nodes.push({
+            id: mem.id,
+            name: mem.fileName,
+            val: 1.5,
+            color: primaryColor,
+            memory: mem,
+            emotions: mem.emotions || [],
+            category: mem.category,
+            subCategoryData: mem.subCategoryData || {},
+            targetX: targetCoord.x,
+            targetY: targetCoord.y,
+            isCluster: false
           });
         }
-      }
+      });
     });
 
     // Create links between nodes
