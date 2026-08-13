@@ -72,6 +72,13 @@ export default function EmotionTagger({ selectedEmotions, onChange }) {
         <div className="glass-panel" style={{ padding: '1rem', marginTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
           {emotionsByType[expandedType].map(emotion => {
             const isSelected = selectedEmotions.includes(emotion.key);
+            
+            // Calculate glow based on intensity level (1 is most intense)
+            let glowSize = '10px';
+            if (emotion.level === 1) glowSize = '25px';
+            else if (emotion.level === 2) glowSize = '15px';
+            else if (emotion.level === 3) glowSize = '5px';
+
             return (
               <button
                 key={emotion.key}
@@ -83,7 +90,7 @@ export default function EmotionTagger({ selectedEmotions, onChange }) {
                   padding: '0.4rem 0.8rem',
                   borderRadius: '15px',
                   cursor: 'pointer',
-                  boxShadow: isSelected ? `0 0 10px ${emotion.color}` : 'none',
+                  boxShadow: isSelected ? `0 0 ${glowSize} ${emotion.color}` : 'none',
                   transition: 'all 0.2s',
                   fontFamily: 'var(--font-body)',
                   fontWeight: isSelected ? '600' : '400'

@@ -1,6 +1,8 @@
 import { useRef, useEffect, useState, useMemo } from 'react';
+import { forceX, forceY } from 'd3-force';
 import ForceGraph2D from 'react-force-graph-2d';
 import { emotions } from '../data/schema';
+import { getMemoryTargetCoordinate } from '../utils/math';
 
 export default function NeuralNetworkMap({ memories, onNodeClick }) {
   const fgRef = useRef();
@@ -39,6 +41,9 @@ export default function NeuralNetworkMap({ memories, onNodeClick }) {
         }
       }
 
+      // Compute target plotting coordinate based on emotion vectors
+      const targetCoord = getMemoryTargetCoordinate(mem.emotions);
+
       nodes.push({
         id: mem.id,
         name: mem.fileName,
@@ -47,7 +52,9 @@ export default function NeuralNetworkMap({ memories, onNodeClick }) {
         memory: mem,
         emotions: mem.emotions || [],
         category: mem.category,
-        subCategoryData: mem.subCategoryData || {}
+        subCategoryData: mem.subCategoryData || {},
+        targetX: targetCoord.x,
+        targetY: targetCoord.y
       });
     });
 
@@ -109,13 +116,17 @@ export default function NeuralNetworkMap({ memories, onNodeClick }) {
   }, [memories]);
 
   useEffect(() => {
-    // Apply custom link force based on the computed weights
+    // Apply custom forces based on emotion coordinates and relationship links
     if (fgRef.current) {
       fgRef.current.d3Force('link').distance(link => {
         // Stronger connections (higher value) = shorter distance
         return 100 / (link.value || 1);
       });
-      fgRef.current.d3Force('charge').strength(-200); // Repel nodes slightly so they don't overlap completely
+      fgRef.current.d3Force('charge').strength(-150); // Repel nodes slightly
+
+      // Apply gravitational pull towards the emotion-based target coordinates
+      fgRef.current.d3Force('x', forceX(node => node.targetX || 0).strength(0.3));
+      fgRef.current.d3Force('y', forceY(node => node.targetY || 0).strength(0.3));
     }
   }, [graphData]);
 
