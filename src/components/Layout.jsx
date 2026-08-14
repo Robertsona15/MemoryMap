@@ -70,6 +70,17 @@ export default function Layout() {
           >
             Gallery
           </Link>
+          <Link 
+            to="/sort" 
+            style={{ 
+              color: location.pathname === '/sort' ? 'var(--color-primary)' : 'var(--color-text-muted)',
+              textDecoration: 'none',
+              fontWeight: '600',
+              textShadow: location.pathname === '/sort' ? '0 0 8px var(--color-glow)' : 'none'
+            }}
+          >
+            Quick Sort
+          </Link>
         </nav>
       </header>
       

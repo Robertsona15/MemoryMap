@@ -5,6 +5,15 @@ import EmotionTagger from './EmotionTagger';
 import MemoryDetailsEditor from './MemoryDetailsEditor';
 import { getFileUrlFromHandle } from '../utils/storage';
 
+const formatDateForInput = (isoString) => {
+  if (!isoString) return '';
+  try {
+    return new Date(isoString).toISOString().split('T')[0];
+  } catch(e) {
+    return '';
+  }
+};
+
 export default function AdvancedEditor() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -29,6 +38,9 @@ export default function AdvancedEditor() {
           linkedMemories: [],
           isEntityCover: false,
           entityRelationships: [],
+          pastEmotions: [],
+          pastDate: '',
+          currentDate: '',
           ...(mem.advancedDetails || {})
         };
         
@@ -55,29 +67,6 @@ export default function AdvancedEditor() {
   const handleSave = async () => {
     await saveMemory(memory);
     navigate(-1); // Go back to wherever they came from
-  };
-
-  const handleLinkMemory = (linkId) => {
-    if (!linkId) return;
-    if (memory.advancedDetails.linkedMemories.includes(linkId)) return;
-    
-    setMemory({
-      ...memory,
-      advancedDetails: {
-        ...memory.advancedDetails,
-        linkedMemories: [...memory.advancedDetails.linkedMemories, linkId]
-      }
-    });
-  };
-
-  const handleRemoveLink = (linkId) => {
-    setMemory({
-      ...memory,
-      advancedDetails: {
-        ...memory.advancedDetails,
-        linkedMemories: memory.advancedDetails.linkedMemories.filter(id => id !== linkId)
-      }
-    });
   };
 
   const uniqueEntities = useMemo(() => {
@@ -233,59 +222,39 @@ export default function AdvancedEditor() {
             )}
           </div>
 
-          {/* Memory Linking */}
-          <div style={{ padding: '1.5rem', background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius)', border: '1px solid var(--color-border)' }}>
-            <h3 style={{ color: 'var(--color-secondary)', marginBottom: '1rem', fontSize: '1.1rem' }}>Explicit Memory Linking</h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>Directly link this memory to others to create a Black Hole gravitational effect.</p>
-            
-            <select 
-              onChange={(e) => handleLinkMemory(e.target.value)}
-              value=""
-              style={{ width: '100%', padding: '0.8rem', borderRadius: '5px', border: '1px solid var(--color-border)', background: 'rgba(255,255,255,0.05)', color: 'white', marginBottom: '1rem', fontFamily: 'var(--font-body)' }}
-            >
-              <option value="" disabled>Select a memory or group to link...</option>
-              <optgroup label="Entities / Groups">
-                {uniqueEntities.map(entity => (
-                  <option key={`GROUP:${entity}`} value={`GROUP:${entity}`}>{entity}</option>
-                ))}
-              </optgroup>
-              <optgroup label="Ungrouped Individual Memories">
-                {allMemories.filter(m => !m.advancedDetails?.entityName?.trim()).map(m => (
-                  <option key={m.id} value={m.id}>{m.fileName}</option>
-                ))}
-              </optgroup>
-            </select>
-
-            {memory.advancedDetails.linkedMemories.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {memory.advancedDetails.linkedMemories.map(linkId => {
-                  const isGroup = linkId.startsWith('GROUP:');
-                  let displayName = linkId;
-                  if (isGroup) {
-                    displayName = `Entity Group: ${linkId.replace('GROUP:', '')}`;
-                  } else {
-                    const linkedMem = allMemories.find(m => m.id === linkId);
-                    if (linkedMem) displayName = linkedMem.fileName;
-                  }
-                  
-                  return (
-                    <div key={linkId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.1)', padding: '0.5rem', borderRadius: '5px' }}>
-                      <span style={{ fontSize: '0.9rem', color: 'var(--color-text)' }}>{displayName}</span>
-                      <button onClick={() => handleRemoveLink(linkId)} style={{ background: 'transparent', border: 'none', color: '#F44336', cursor: 'pointer' }}>✕</button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
         </div>
 
         {/* Right Column: Standard Editor */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           <EmotionTagger 
+            title="Current Emotions (How you feel now)"
             selectedEmotions={memory.emotions} 
             onChange={(emotions) => setMemory({ ...memory, emotions })} 
           />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem', padding: '1rem', background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius)', border: '1px solid var(--color-border)' }}>
+            <label style={{ color: 'var(--color-text)', fontSize: '0.9rem' }}>Date of Current Emotions</label>
+            <input 
+              type="date" 
+              value={memory.advancedDetails.currentDate || formatDateForInput(new Date().toISOString())}
+              onChange={(e) => setMemory({...memory, advancedDetails: {...memory.advancedDetails, currentDate: e.target.value}})}
+              style={{ background: 'var(--color-bg-light)', color: 'var(--color-text)', border: '1px solid var(--color-border)', padding: '0.5rem', borderRadius: 'var(--radius)', outline: 'none' }}
+            />
+          </div>
+
+          <EmotionTagger 
+            title="Past Emotions (How you felt when taken)"
+            selectedEmotions={memory.advancedDetails.pastEmotions || []} 
+            onChange={(pastEmotions) => setMemory({ ...memory, advancedDetails: { ...memory.advancedDetails, pastEmotions } })} 
+          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem', padding: '1rem', background: 'rgba(0,0,0,0.2)', borderRadius: 'var(--radius)', border: '1px solid var(--color-border)' }}>
+            <label style={{ color: 'var(--color-text)', fontSize: '0.9rem' }}>Date of Past Emotions</label>
+            <input 
+              type="date" 
+              value={memory.advancedDetails.pastDate || formatDateForInput(memory.metadata?.date)}
+              onChange={(e) => setMemory({...memory, advancedDetails: {...memory.advancedDetails, pastDate: e.target.value}})}
+              style={{ background: 'var(--color-bg-light)', color: 'var(--color-text)', border: '1px solid var(--color-border)', padding: '0.5rem', borderRadius: 'var(--radius)', outline: 'none' }}
+            />
+          </div>
           <MemoryDetailsEditor 
             category={memory.category}
             setCategory={(c) => setMemory({ ...memory, category: c })}

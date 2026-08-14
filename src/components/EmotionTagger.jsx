@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { emotions, coreEmotionTypes, compoundEmotions } from '../data/schema';
 
-export default function EmotionTagger({ selectedEmotions, onChange }) {
+export default function EmotionTagger({ selectedEmotions, onChange, title = "Tag Emotions" }) {
   // selectedEmotions is an array of emotion keys, e.g. ['joy', 'ecstasy']
   
   const [expandedType, setExpandedType] = useState(null);
@@ -55,7 +55,7 @@ export default function EmotionTagger({ selectedEmotions, onChange }) {
 
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      <h3 style={{ color: 'var(--color-text)' }}>Tag Emotions</h3>
+      <h3 style={{ color: 'var(--color-text)' }}>{title}</h3>
       
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
         {coreEmotionTypes.map(type => {

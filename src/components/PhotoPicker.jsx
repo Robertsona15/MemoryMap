@@ -64,6 +64,11 @@ export default function PhotoPicker({ onPhotoSelect, onBulkImport }) {
         console.warn('Could not parse EXIF data', exifErr);
       }
 
+      // Fallback to file creation date (lastModified)
+      if (!metadata.date && file.lastModified) {
+        metadata.date = new Date(file.lastModified).toISOString();
+      }
+
       onPhotoSelect({
         fileHandle,
         fileName: file.name,

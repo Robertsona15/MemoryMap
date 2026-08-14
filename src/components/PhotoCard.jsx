@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { getFileUrlFromHandle } from '../utils/storage';
 import { emotions } from '../data/schema';
 
-export default function PhotoCard({ memory, onEdit }) {
+export default function PhotoCard({ memory, onEdit, isGroupCover, groupCount, groupName }) {
   const [imgUrl, setImgUrl] = useState(null);
   const [error, setError] = useState(false);
 
@@ -52,11 +52,18 @@ export default function PhotoCard({ memory, onEdit }) {
       onClick={() => onEdit && onEdit(memory)}
     >
       {imgUrl ? (
-        <img 
-          src={imgUrl} 
-          alt={memory.fileName}
-          style={{ width: '100%', height: '250px', objectFit: 'cover', display: 'block' }}
-        />
+        <>
+          <img 
+            src={imgUrl} 
+            alt={memory.fileName}
+            style={{ width: '100%', height: '250px', objectFit: 'cover', display: 'block' }}
+          />
+          {isGroupCover && (
+            <div style={{ position: 'absolute', top: '10px', right: '10px', background: 'rgba(0,0,0,0.7)', color: 'white', padding: '5px 10px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold', backdropFilter: 'blur(5px)', border: '1px solid rgba(255,255,255,0.2)' }}>
+              {groupCount} Memories
+            </div>
+          )}
+        </>
       ) : (
         <div style={{ width: '100%', height: '250px', display: 'flex', justifyContent: 'center', alignItems: 'center', background: 'rgba(0,0,0,0.5)' }}>
           {error ? <p style={{ color: '#F44336', textAlign: 'center', padding: '1rem' }}>Click to re-authorize access to this photo</p> : <p>Loading cosmic data...</p>}
@@ -64,37 +71,46 @@ export default function PhotoCard({ memory, onEdit }) {
       )}
       
       <div style={{ padding: '1rem', background: 'var(--color-bg-light)' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginBottom: '0.5rem' }}>
-          {memory.emotions && memory.emotions.map(emotionKey => {
-            const em = emotions[emotionKey];
-            if (!em) return null;
-            return (
-              <span key={emotionKey} style={{ 
-                fontSize: '0.7rem', 
-                background: em.color, 
-                color: '#000', 
-                padding: '2px 8px', 
-                borderRadius: '10px',
-                fontWeight: '600'
-              }}>
-                {em.label}
-              </span>
-            );
-          })}
-        </div>
-        
-        {memory.category && (
-          <p style={{ fontSize: '0.8rem', color: 'var(--color-text)' }}>
-            <strong>{memory.category.toUpperCase()}</strong>
-            {memory.subCategoryData && memory.subCategoryData.relationship && ` - ${memory.subCategoryData.relationship}`}
-            {memory.subCategoryData && memory.subCategoryData.characteristics && ` - ${memory.subCategoryData.characteristics}`}
-          </p>
-        )}
-        
-        {memory.metadata?.locationStr && (
-          <p style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginTop: '0.2rem' }}>
-            📍 {memory.metadata.locationStr}
-          </p>
+        {isGroupCover ? (
+          <div style={{ textAlign: 'center', padding: '0.5rem 0' }}>
+            <h3 style={{ margin: 0, color: 'var(--color-primary)', textShadow: '0 0 5px var(--color-glow)' }}>{groupName}</h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', margin: '0.5rem 0 0 0' }}>Click to view album</p>
+          </div>
+        ) : (
+          <>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginBottom: '0.5rem' }}>
+              {memory.emotions && memory.emotions.map(emotionKey => {
+                const em = emotions[emotionKey];
+                if (!em) return null;
+                return (
+                  <span key={emotionKey} style={{ 
+                    fontSize: '0.7rem', 
+                    background: em.color, 
+                    color: '#000', 
+                    padding: '2px 8px', 
+                    borderRadius: '10px',
+                    fontWeight: '600'
+                  }}>
+                    {em.label}
+                  </span>
+                );
+              })}
+            </div>
+            
+            {memory.category && (
+              <p style={{ fontSize: '0.8rem', color: 'var(--color-text)' }}>
+                <strong>{memory.category.toUpperCase()}</strong>
+                {memory.subCategoryData && memory.subCategoryData.relationship && ` - ${memory.subCategoryData.relationship}`}
+                {memory.subCategoryData && memory.subCategoryData.characteristics && ` - ${memory.subCategoryData.characteristics}`}
+              </p>
+            )}
+            
+            {memory.metadata?.locationStr && (
+              <p style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginTop: '0.2rem' }}>
+                📍 {memory.metadata.locationStr}
+              </p>
+            )}
+          </>
         )}
       </div>
     </div>

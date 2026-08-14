@@ -6,6 +6,8 @@ import EmotionTagger from './components/EmotionTagger';
 import MemoryDetailsEditor from './components/MemoryDetailsEditor';
 import NeuralNetworkMap from './components/NeuralNetworkMap';
 import PhotoGallery from './components/PhotoGallery';
+import QuickSortMap from './components/QuickSortMap';
+import exifr from 'exifr';
 
 export default function AppContent({ view }) {
   const navigate = useNavigate();
@@ -30,9 +32,12 @@ export default function AppContent({ view }) {
       advancedDetails: {
         entityName: '',
         linkedMemories: [],
-        isEntityCover: false,
-        entityRelationships: []
-      },
+                isEntityCover: false,
+                entityRelationships: [],
+                pastEmotions: [],
+                pastDate: '',
+                currentDate: ''
+              },
       notes: ''
     });
   };
@@ -44,6 +49,20 @@ export default function AppContent({ view }) {
       for await (const entry of dir.values()) {
         if (entry.kind === 'file') {
           if (entry.name.match(/\.(jpg|jpeg|png|webp|gif|heic)$/i)) {
+            const file = await entry.getFile();
+            let metadata = { locationStr: '', date: '' };
+            try {
+              const exifData = await exifr.parse(file);
+              if (exifData && exifData.DateTimeOriginal) {
+                metadata.date = exifData.DateTimeOriginal.toISOString();
+              }
+            } catch (e) {
+              console.warn('Could not parse EXIF data during bulk import', e);
+            }
+            if (!metadata.date && file.lastModified) {
+              metadata.date = new Date(file.lastModified).toISOString();
+            }
+
             const mem = {
               fileHandle: entry,
               fileName: entry.name,
@@ -54,10 +73,13 @@ export default function AppContent({ view }) {
                 entityName: '',
                 linkedMemories: [],
                 isEntityCover: false,
-                entityRelationships: []
+                entityRelationships: [],
+                pastEmotions: [],
+                pastDate: '',
+                currentDate: ''
               },
               notes: '',
-              metadata: { locationStr: '', date: '' }
+              metadata
             };
             const savedMem = await saveMemory(mem);
             newMemories.push(savedMem);
@@ -160,11 +182,28 @@ export default function AppContent({ view }) {
           <PhotoPicker onPhotoSelect={handlePhotoSelect} onBulkImport={handleBulkImport} />
           
           {memories.length > 0 && view === 'map' && (
-            <NeuralNetworkMap memories={memories} onNodeClick={(mem) => setActiveMemory(mem)} />
+            <NeuralNetworkMap 
+              memories={memories} 
+              onNodeClick={(mem) => setActiveMemory(mem)} 
+              onMemoryUpdated={async (updatedMemory) => {
+                const newMemories = memories.map(m => m.id === updatedMemory.id ? updatedMemory : m);
+                setMemories(newMemories);
+              }}
+            />
           )}
           
           {memories.length > 0 && view === 'gallery' && (
             <PhotoGallery memories={memories} onEdit={(mem) => setActiveMemory(mem)} />
+          )}
+
+          {view === 'sort' && (
+            <QuickSortMap 
+              memories={memories} 
+              onMemorySorted={async (updatedMemory) => {
+                const newMemories = memories.map(m => m.id === updatedMemory.id ? updatedMemory : m);
+                setMemories(newMemories);
+              }} 
+            />
           )}
         </div>
       )}

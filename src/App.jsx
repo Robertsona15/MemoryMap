@@ -11,6 +11,7 @@ export default function App() {
           <Route index element={<Navigate to="/map" replace />} />
           <Route path="map" element={<AppContent view="map" />} />
           <Route path="gallery" element={<AppContent view="gallery" />} />
+          <Route path="sort" element={<AppContent view="sort" />} />
           <Route path="editor/:id" element={<AdvancedEditor />} />
         </Route>
       </Routes>
