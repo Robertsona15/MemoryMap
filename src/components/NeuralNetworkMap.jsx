@@ -14,6 +14,7 @@ export default function NeuralNetworkMap({ memories, onNodeClick }) {
   useEffect(() => {
     let active = true;
     async function loadImages() {
+      if (!memories) return;
       const newImages = { ...images };
       for (const mem of memories) {
         if (!newImages[mem.id] && mem.fileHandle) {
@@ -38,6 +39,7 @@ export default function NeuralNetworkMap({ memories, onNodeClick }) {
     const hubNodes = [];
     const baseLinks = [];
 
+    if (!memories) return;
     const mapMemories = memories.filter(m => m.emotions && m.emotions.length > 0);
 
     // 1. Build adjacency list for explicit grouping (Entity Name & GROUP: links)
