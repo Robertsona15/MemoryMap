@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { categories, relationshipTypes } from '../data/schema';
 
 const commonInputStyle = {
