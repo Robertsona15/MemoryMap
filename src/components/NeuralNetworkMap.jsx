@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useMemo } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { forceX, forceY } from 'd3-force';
 import ForceGraph2D from 'react-force-graph-2d';
 import { emotions, memoryRelationships, relationshipIntensityDefaults } from '../data/schema';
