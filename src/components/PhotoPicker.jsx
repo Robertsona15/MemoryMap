@@ -53,7 +53,7 @@ export default function PhotoPicker({ onPhotoSelect, onBulkImport }) {
       try {
         const exifData = await exifr.parse(file);
         if (exifData) {
-          if (exifData.DateTimeOriginal) {
+          if (exifData.DateTimeOriginal && exifData.DateTimeOriginal instanceof Date) {
             metadata.date = exifData.DateTimeOriginal.toISOString();
           }
           if (exifData.latitude && exifData.longitude) {
