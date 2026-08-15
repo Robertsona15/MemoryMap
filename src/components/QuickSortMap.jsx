@@ -21,7 +21,7 @@ const interpolateColor = (colorA, colorB, t) => {
 };
 
 const getCoreColor = (type) => {
-  const entry = Object.entries(emotions).find(([k, v]) => v.type === type && v.level === 2);
+  const entry = Object.entries(emotions).find(([_k, v]) => v.type === type && v.level === 2);
   return entry ? entry[1].color : '#FFFFFF';
 };
 
@@ -38,7 +38,7 @@ const generateZones = () => {
     const coreStart = baseAngle - sliceSize / 2;
     const coreEnd = baseAngle + sliceSize / 2;
     
-    const getCoreKey = (lvl) => Object.entries(emotions).find(([k,v]) => v.type === type && v.level === lvl)?.[0];
+    const getCoreKey = (lvl) => Object.entries(emotions).find(([_k,v]) => v.type === type && v.level === lvl)?.[0];
     const l1Key = getCoreKey(1);
     const l2Key = getCoreKey(2);
     const l3Key = getCoreKey(3);
