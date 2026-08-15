@@ -1,6 +1,16 @@
 import { useState } from 'react';
 import { categories, relationshipTypes } from '../data/schema';
 
+const commonInputStyle = {
+  background: 'var(--color-bg-light)',
+  color: 'var(--color-text)',
+  border: '1px solid var(--color-border)',
+  padding: '0.5rem',
+  borderRadius: 'var(--radius)',
+  fontFamily: 'var(--font-body)',
+  outline: 'none'
+};
+
 export default function MemoryDetailsEditor({ 
   category, 
   setCategory, 
@@ -29,15 +39,7 @@ export default function MemoryDetailsEditor({
         <select 
           value={category || ''} 
           onChange={handleCategoryChange}
-          style={{
-            background: 'var(--color-bg-light)',
-            color: 'var(--color-text)',
-            border: '1px solid var(--color-border)',
-            padding: '0.5rem',
-            borderRadius: 'var(--radius)',
-            fontFamily: 'var(--font-body)',
-            outline: 'none'
-          }}
+          style={commonInputStyle}
         >
           <option value="" disabled>Select a category...</option>
           {categories.map(c => (
@@ -53,15 +55,7 @@ export default function MemoryDetailsEditor({
           <select 
             value={subCategoryData.relationship || ''} 
             onChange={(e) => handleSubDataChange('relationship', e.target.value)}
-            style={{
-              background: 'var(--color-bg-light)',
-              color: 'var(--color-text)',
-              border: '1px solid var(--color-border)',
-              padding: '0.5rem',
-              borderRadius: 'var(--radius)',
-              fontFamily: 'var(--font-body)',
-              outline: 'none'
-            }}
+            style={commonInputStyle}
           >
             <option value="" disabled>Select relationship...</option>
             {relationshipTypes.map(rt => (
@@ -81,15 +75,7 @@ export default function MemoryDetailsEditor({
             value={subCategoryData.characteristics || ''}
             onChange={(e) => handleSubDataChange('characteristics', e.target.value)}
             placeholder={`E.g. ${category === 'place' ? 'Cozy coffee shop' : 'Vintage style'}`}
-            style={{
-              background: 'var(--color-bg-light)',
-              color: 'var(--color-text)',
-              border: '1px solid var(--color-border)',
-              padding: '0.5rem',
-              borderRadius: 'var(--radius)',
-              fontFamily: 'var(--font-body)',
-              outline: 'none'
-            }}
+            style={commonInputStyle}
           />
         </div>
       )}
