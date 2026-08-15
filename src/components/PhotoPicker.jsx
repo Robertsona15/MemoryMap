@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import exifr from 'exifr';
-import { UploadCloud } from 'lucide-react';
 
 const geocodeCache = new Map();
 
