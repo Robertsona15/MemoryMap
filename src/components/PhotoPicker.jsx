@@ -25,7 +25,7 @@ export default function PhotoPicker({ onPhotoSelect, onBulkImport }) {
     } catch (err) {
       console.warn('Reverse geocoding failed:', err);
     }
-    return `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`; // fallback
+    return `${Number(latitude).toFixed(4)}, ${Number(longitude).toFixed(4)}`; // fallback
   };
 
   const handleSelectPhoto = async () => {
