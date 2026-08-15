@@ -9,14 +9,24 @@ export default function PhotoPicker({ onPhotoSelect, onBulkImport }) {
   const [error, setError] = useState(null);
 
   const reverseGeocode = async (latitude, longitude) => {
-    const cacheKey = `${latitude},${longitude}`;
+    const latNum = Number(latitude);
+    const lonNum = Number(longitude);
+
+    if (Number.isNaN(latNum) || Number.isNaN(lonNum)) {
+      console.warn('Invalid coordinates provided to reverseGeocode');
+      return null;
+    }
+
+    const cacheKey = `${latNum},${lonNum}`;
     if (geocodeCache.has(cacheKey)) {
       return geocodeCache.get(cacheKey);
     }
 
     try {
       // Using OpenStreetMap Nominatim for free client-side reverse geocoding
-      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`);
+      const encodedLat = encodeURIComponent(latNum);
+      const encodedLon = encodeURIComponent(lonNum);
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${encodedLat}&lon=${encodedLon}&format=json`);
       const data = await res.json();
       if (data && data.display_name) {
         geocodeCache.set(cacheKey, data.display_name);
@@ -25,7 +35,7 @@ export default function PhotoPicker({ onPhotoSelect, onBulkImport }) {
     } catch (err) {
       console.warn('Reverse geocoding failed:', err);
     }
-    return `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`; // fallback
+    return `${latNum.toFixed(4)}, ${lonNum.toFixed(4)}`; // fallback
   };
 
   const handleSelectPhoto = async () => {
