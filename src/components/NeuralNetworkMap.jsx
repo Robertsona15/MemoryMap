@@ -660,12 +660,10 @@ export default function NeuralNetworkMap({ memories, onNodeClick, onMemoryUpdate
 
   // Sub-component for Connection Modal
   const ConnectionModal = () => {
-    if (!connectSourceNode || !connectTargetNode) return null;
-
-    const mem1 = connectSourceNode.memory;
-    const mem2 = connectTargetNode.memory;
-    const cat1 = mem1.category || 'default';
-    const cat2 = mem2.category || 'default';
+    const mem1 = connectSourceNode?.memory;
+    const mem2 = connectTargetNode?.memory;
+    const cat1 = mem1?.category || 'default';
+    const cat2 = mem2?.category || 'default';
     const suggestions = memoryRelationships[`${cat1}_${cat2}`] || memoryRelationships[`${cat2}_${cat1}`] || memoryRelationships.default;
     const groupKeys = Object.keys(suggestions);
 
@@ -673,15 +671,17 @@ export default function NeuralNetworkMap({ memories, onNodeClick, onMemoryUpdate
     const [label, setLabel] = useState(suggestions[groupKeys[0]][0] || 'Related To');
     const [customLabel, setCustomLabel] = useState('');
     
-    const existingLinkIdx1 = (mem1.advancedDetails?.customLinks || []).findIndex(l => l.targetId === mem2.id);
-    const existingLinkIdx2 = (mem2.advancedDetails?.customLinks || []).findIndex(l => l.targetId === mem1.id);
+    const existingLinkIdx1 = (mem1?.advancedDetails?.customLinks || []).findIndex(l => l.targetId === mem2?.id);
+    const existingLinkIdx2 = (mem2?.advancedDetails?.customLinks || []).findIndex(l => l.targetId === mem1?.id);
     const isLinked = existingLinkIdx1 >= 0 || existingLinkIdx2 >= 0;
 
     let defaultIntensity = relationshipIntensityDefaults[suggestions[groupKeys[0]][0]] || 50;
-    if (existingLinkIdx1 >= 0) defaultIntensity = mem1.advancedDetails.customLinks[existingLinkIdx1].intensity;
-    else if (existingLinkIdx2 >= 0) defaultIntensity = mem2.advancedDetails.customLinks[existingLinkIdx2].intensity;
+    if (existingLinkIdx1 >= 0 && mem1) defaultIntensity = mem1.advancedDetails.customLinks[existingLinkIdx1].intensity;
+    else if (existingLinkIdx2 >= 0 && mem2) defaultIntensity = mem2.advancedDetails.customLinks[existingLinkIdx2].intensity;
 
     const [intensity, setIntensity] = useState(defaultIntensity);
+
+    if (!connectSourceNode || !connectTargetNode) return null;
 
     const handleGroupChange = (g) => {
       setSelectedGroup(g);
