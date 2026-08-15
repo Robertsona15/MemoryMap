@@ -1,10 +1,12 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { emotions, coreEmotionTypes, compoundEmotions } from '../data/schema';
 
 export default function EmotionTagger({ selectedEmotions, onChange, title = "Tag Emotions" }) {
   // selectedEmotions is an array of emotion keys, e.g. ['joy', 'ecstasy']
   
   const [expandedType, setExpandedType] = useState(null);
+
+  const selectedEmotionsSet = useMemo(() => new Set(selectedEmotions), [selectedEmotions]);
 
   // Group emotions by type
   const emotionsByType = useMemo(() => {
@@ -25,7 +27,7 @@ export default function EmotionTagger({ selectedEmotions, onChange, title = "Tag
   }, []);
 
   const handleToggleEmotion = (key) => {
-    if (selectedEmotions.includes(key)) {
+    if (selectedEmotionsSet.has(key)) {
       onChange(selectedEmotions.filter(e => e !== key));
     } else {
       onChange([...selectedEmotions, key]);
@@ -33,9 +35,9 @@ export default function EmotionTagger({ selectedEmotions, onChange, title = "Tag
   };
 
   // Determine if a specific type has any selected emotions
-  const hasSelectedEmotionsInType = (type) => {
-    return emotionsByType[type].some(e => selectedEmotions.includes(e.key));
-  };
+  const hasSelectedEmotionsInType = useCallback((type) => {
+    return emotionsByType[type].some(e => selectedEmotionsSet.has(e.key));
+  }, [emotionsByType, selectedEmotionsSet]);
 
   const getBaseColorForType = (type) => {
     const ems = emotionsByType[type];
@@ -48,10 +50,10 @@ export default function EmotionTagger({ selectedEmotions, onChange, title = "Tag
   const visibleCompounds = useMemo(() => {
     return compoundEmotions.filter(c => {
       // Visible if already selected OR if both its component types have at least one selection
-      return selectedEmotions.includes(c.id) || 
+      return selectedEmotionsSet.has(c.id) ||
              (hasSelectedEmotionsInType(c.components[0]) && hasSelectedEmotionsInType(c.components[1]));
     });
-  }, [selectedEmotions, hasSelectedEmotionsInType]);
+  }, [selectedEmotionsSet, hasSelectedEmotionsInType]);
 
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -87,7 +89,7 @@ export default function EmotionTagger({ selectedEmotions, onChange, title = "Tag
       {expandedType && (
         <div className="glass-panel" style={{ padding: '1rem', marginTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
           {emotionsByType[expandedType].map(emotion => {
-            const isSelected = selectedEmotions.includes(emotion.key);
+            const isSelected = selectedEmotionsSet.has(emotion.key);
             
             // Calculate glow based on intensity level (1 is most intense)
             let glowSize = '10px';
@@ -125,7 +127,7 @@ export default function EmotionTagger({ selectedEmotions, onChange, title = "Tag
           <h4 style={{ color: 'var(--color-secondary)', fontSize: '0.9rem', marginBottom: '0.5rem' }}>Compound Emotions</h4>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
             {visibleCompounds.map(compound => {
-              const isSelected = selectedEmotions.includes(compound.id);
+              const isSelected = selectedEmotionsSet.has(compound.id);
               const color1 = getBaseColorForType(compound.components[0]);
               const color2 = getBaseColorForType(compound.components[1]);
               const gradient = `linear-gradient(135deg, ${color1} 0%, ${color2} 100%)`;
